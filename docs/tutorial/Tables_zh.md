@@ -57,6 +57,7 @@ model = AutoModel(model=[str], device=[str], ncpu=[int], output_dir=[str], batch
 *   `ncpu`(int): `4` （默认），设置用于 CPU 内部操作并行性的线程数
     
 *   `output_dir`(str): `None` （默认），如果设置，输出结果的输出路径
+*   `progress_callback`: 可选的回调函数，推理过程中接收进度信息
     
 *   `batch_size`(int): `1` （默认），解码时的批处理，样本个数
     
@@ -93,6 +94,7 @@ asr_example2  ./audios/asr_example2.wav
 *   fbank输入，支持组batch。shape为\[batch, frames, dim\]，类型为torch.Tensor，例如
     
 *   `output_dir`: None （默认），如果设置，输出结果的输出路径
+*   `progress_callback`: 可选的回调函数，推理过程中接收进度信息
     
 *   `**kwargs`(dict): 与模型相关的推理参数，例如，`beam_size=10`，`decoding_ctc_weight=0.1`。
     

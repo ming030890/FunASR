@@ -62,8 +62,9 @@ res = model.generate(input=[str], output_dir=[str])
   - Audio samples, `e.g.`: `audio, rate = soundfile.read("asr_example_zh.wav")`, data type is numpy.ndarray. Supports batch inputs, type is list：
   ```[audio_sample1, audio_sample2, ..., audio_sampleN]```
   - fbank input, supports batch grouping. Shape is [batch, frames, dim], type is torch.Tensor.
-- `output_dir`: None (default), if set, specifies the output path for the results.
-- `**kwargs`(dict): Inference parameters related to the model, for example,`beam_size=10`，`decoding_ctc_weight=0.1`.
+  - `output_dir`: None (default), if set, specifies the output path for the results.
+  - `progress_callback`: Optional callable receiving `(current, total, stats)` to track decoding progress.
+  - `**kwargs`(dict): Inference parameters related to the model, for example,`beam_size=10`，`decoding_ctc_weight=0.1`.
 
 
 ### More Usage Introduction

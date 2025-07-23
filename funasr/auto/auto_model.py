@@ -308,7 +308,29 @@ class AutoModel:
         else:
             return self.inference_with_vad(input, input_len=input_len, **cfg)
 
-    def inference(self, input, input_len=None, model=None, kwargs=None, key=None, **cfg):
+    def inference(
+        self,
+        input,
+        input_len=None,
+        model=None,
+        kwargs=None,
+        key=None,
+        progress_callback=None,
+        **cfg,
+    ):
+        """Run inference on the input data.
+
+        Args:
+            input: Input data.
+            input_len: Length of the input when using fbank features.
+            model: The model to use for inference, defaults to ``self.model``.
+            kwargs: Additional keyword arguments for the model.
+            key: Optional utterance id.
+            progress_callback: Optional callable receiving ``(current, total, stats)``
+                after each batch is processed so that clients can display custom
+                progress bars.
+            **cfg: Other configuration options overriding ``self.kwargs``.
+        """
         kwargs = self.kwargs if kwargs is None else kwargs
         if "cache" in kwargs:
             kwargs.pop("cache")
@@ -327,7 +349,7 @@ class AutoModel:
         speed_stats = {}
         asr_result_list = []
         num_samples = len(data_list)
-        disable_pbar = self.kwargs.get("disable_pbar", False)
+        disable_pbar = self.kwargs.get("disable_pbar", False) or progress_callback is not None
         pbar = (
             tqdm(colour="blue", total=num_samples, dynamic_ncols=True) if not disable_pbar else None
         )
@@ -365,12 +387,22 @@ class AutoModel:
             if pbar:
                 pbar.update(end_idx - beg_idx)
                 pbar.set_description(description)
+            if progress_callback:
+                try:
+                    progress_callback(end_idx, num_samples, speed_stats)
+                except Exception as e:
+                    logging.error(f"progress_callback error: {e}")
             time_speech_total += batch_data_time
             time_escape_total += time_escape
 
         if pbar:
             # pbar.update(1)
             pbar.set_description(f"rtf_avg: {time_escape_total/time_speech_total:0.3f}")
+        if progress_callback:
+            try:
+                progress_callback(num_samples, num_samples, {"rtf_avg": f"{time_escape_total/time_speech_total:0.3f}"})
+            except Exception as e:
+                logging.error(f"progress_callback error: {e}")
 
         device = next(model.parameters()).device
         if device.type == "cuda":

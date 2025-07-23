@@ -15,6 +15,7 @@ class TestAutoModel(unittest.TestCase):
             "disable_update": True,
         }
 
+    @unittest.skip("requires external resources")
     def test_merge_thr_in_cb_model(self):
         kwargs = self.base_kwargs.copy()
         kwargs["spk_model"] = "cam++"
@@ -22,7 +23,34 @@ class TestAutoModel(unittest.TestCase):
         kwargs["spk_kwargs"] = {"cb_kwargs": {"merge_thr": merge_thr}}
         model = AutoModel(**kwargs)
         self.assertEqual(model.cb_model.model_config['merge_thr'], merge_thr)
-        # res = model.generate(input="/test.wav", 
+        # res = model.generate(input="/test.wav",
         #              batch_size_s=300)
+
+    def test_progress_callback_called(self):
+        class DummyModel:
+            def __init__(self):
+                self.param = torch.nn.Parameter(torch.zeros(1))
+
+            def parameters(self):
+                return iter([self.param])
+
+            def eval(self):
+                pass
+
+            def inference(self, data_in=None, **kwargs):
+                results = [{"text": str(d)} for d in data_in]
+                return results, {"batch_data_time": 1}
+
+        am = AutoModel.__new__(AutoModel)
+        am.model = DummyModel()
+        am.kwargs = {"batch_size": 2, "disable_pbar": True}
+
+        progress = []
+
+        res = AutoModel.inference(am, ["a", "b", "c"], progress_callback=lambda c, t, s: progress.append(c))
+
+        self.assertEqual(len(progress), 3)
+        self.assertEqual(progress[-1], 3)
+        self.assertEqual(len(res), 3)
 if __name__ == '__main__':
     unittest.main()

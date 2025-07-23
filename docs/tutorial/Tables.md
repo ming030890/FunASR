@@ -93,6 +93,7 @@ In this input
 *   fbank input, support group batch. shape is \[batch, frames, dim\], type is torch.Tensor, for example
     
 *   `output_dir`: None (default), if set, the output path of the output result
+*   `progress_callback`: Optional callable receiving `(current, total, stats)` to track decoding progress
     
 *   `**kwargs`(dict): Model-related inference parameters, e.g,`beam_size=10`,`decoding_ctc_weight=0.1`.
     
