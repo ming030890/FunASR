@@ -21,6 +21,11 @@ from funasr.register import tables
 from funasr.models.paraformer.search import Hypothesis
 from .utils.ctc_alignment import ctc_forced_align
 
+try:
+    from pyctcdecode import build_ctcdecoder
+except Exception:
+    build_ctcdecoder = None
+
 
 class SinusoidalPositionEncoder(torch.nn.Module):
     """ """
@@ -661,6 +666,9 @@ class SenseVoiceSmall(nn.Module):
             normalize_length=self.length_normalized_loss,
         )
 
+        self._ctc_decoder = None
+        self._lm_path = None
+
     @staticmethod
     def from_pretrained(model: str = None, **kwargs):
         from funasr import AutoModel
@@ -893,8 +901,6 @@ class SenseVoiceSmall(nn.Module):
             key = key * b
         for i in range(b):
             x = ctc_logits[i, : encoder_out_lens[i].item(), :]
-            yseq = x.argmax(dim=-1)
-            yseq = torch.unique_consecutive(yseq, dim=-1)
 
             ibest_writer = None
             if kwargs.get("output_dir") is not None:
@@ -902,11 +908,38 @@ class SenseVoiceSmall(nn.Module):
                     self.writer = DatadirWriter(kwargs.get("output_dir"))
                 ibest_writer = self.writer[f"1best_recog"]
 
-            mask = yseq != self.blank_id
-            token_int = yseq[mask].tolist()
+            lm_file = kwargs.get("lm_file")
+            lm_weight = float(kwargs.get("lm_weight", 0.0))
+            beam_size = int(kwargs.get("beam_size", 10))
+            use_lm = (
+                beam_size > 1
+                and lm_weight > 0
+                and lm_file is not None
+                and build_ctcdecoder is not None
+            )
 
-            # Change integer-ids to tokens
-            text = tokenizer.decode(token_int)
+            if use_lm:
+                if self._ctc_decoder is None or self._lm_path != lm_file:
+                    labels = getattr(tokenizer, "token_list", None)
+                    if labels is None:
+                        labels = [str(i) for i in range(self.vocab_size)]
+                    self._ctc_decoder = build_ctcdecoder(
+                        labels,
+                        kenlm_model_path=lm_file,
+                        alpha=lm_weight,
+                        beta=kwargs.get("beta", 1.5),
+                    )
+                    self._lm_path = lm_file
+                text = self._ctc_decoder.decode(
+                    x.cpu().numpy(), beam_width=beam_size
+                )
+                token_int = tokenizer.encode(text)
+            else:
+                yseq = x.argmax(dim=-1)
+                yseq = torch.unique_consecutive(yseq, dim=-1)
+                mask = yseq != self.blank_id
+                token_int = yseq[mask].tolist()
+                text = tokenizer.decode(token_int)
 
             # result_i = {"key": key[i], "text": text}
             # results.append(result_i)
