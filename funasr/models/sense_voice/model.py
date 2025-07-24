@@ -923,6 +923,10 @@ class SenseVoiceSmall(nn.Module):
                     labels = getattr(tokenizer, "token_list", None)
                     if labels is None:
                         labels = [str(i) for i in range(self.vocab_size)]
+                    else:
+                        labels = list(labels)
+                    if 0 <= self.blank_id < len(labels):
+                        labels[self.blank_id] = ""
                     self._ctc_decoder = build_ctcdecoder(
                         labels,
                         kenlm_model_path=lm_file,
