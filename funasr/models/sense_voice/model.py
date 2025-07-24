@@ -22,9 +22,9 @@ from funasr.models.paraformer.search import Hypothesis
 from .utils.ctc_alignment import ctc_forced_align
 
 try:
-    from pyctcdecode import build_ctcdecoder
+    from torchaudio.models.decoder import ctc_decoder
 except Exception:
-    build_ctcdecoder = None
+    ctc_decoder = None
 
 
 class SinusoidalPositionEncoder(torch.nn.Module):
@@ -915,7 +915,7 @@ class SenseVoiceSmall(nn.Module):
                 beam_size > 1
                 and lm_weight > 0
                 and lm_file is not None
-                and build_ctcdecoder is not None
+                and ctc_decoder is not None
             )
 
             if use_lm:
@@ -925,18 +925,19 @@ class SenseVoiceSmall(nn.Module):
                         labels = [str(i) for i in range(self.vocab_size)]
                     else:
                         labels = list(labels)
+                    blank = "<blk>"
                     if 0 <= self.blank_id < len(labels):
-                        labels[self.blank_id] = ""
-                    self._ctc_decoder = build_ctcdecoder(
+                        blank = labels[self.blank_id]
+                    self._ctc_decoder = ctc_decoder(
                         labels,
-                        kenlm_model_path=lm_file,
-                        alpha=lm_weight,
-                        beta=kwargs.get("beta", 1.5),
+                        lm=lm_file,
+                        blank_token=blank,
                     )
                     self._lm_path = lm_file
-                text = self._ctc_decoder.decode(
-                    x.cpu().numpy(), beam_width=beam_size
+                decoded = self._ctc_decoder(
+                    x.cpu(), beam_size=beam_size, lm_weight=lm_weight
                 )
+                text = decoded[0][0]
                 token_int = tokenizer.encode(text)
             else:
                 yseq = x.argmax(dim=-1)
